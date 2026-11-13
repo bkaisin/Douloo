@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Douloo</title>
+  <meta name="description" content="Douloo : variations des 300 plus grosses cryptos en liste, bulles, essaim et heatmap.">
+  <meta name="theme-color" content="#111214">
+  <meta name="color-scheme" content="dark light">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Douloo">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://api.coingecko.com" crossorigin>
+  <link rel="preconnect" href="https://coins.llama.fi" crossorigin>
+  <link rel="preconnect" href="https://coin-images.coingecko.com">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // Apply the saved theme before first paint (dark by default).
+    try {
+      var p = JSON.parse(localStorage.getItem('douloo.prefs') || '{}');
+      if (p.theme === 'light') document.documentElement.dataset.theme = 'light';
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" id="brand"></div>
+    <div class="seg seg-mode" id="modeSeg" role="group" aria-label="Tokens ou narratifs"></div>
+    <div class="seg seg-tf" id="tfSeg" role="group" aria-label="Période"></div>
+    <div class="seg seg-view" id="viewSeg" role="group" aria-label="Affichage"></div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn" id="refreshBtn" aria-label="Actualiser"></button>
+      <button type="button" class="icon-btn" id="themeBtn" aria-label="Changer de thème"></button>
+      <button type="button" class="icon-btn" id="settingsBtn" aria-label="Réglages"></button>
+    </div>
+  </header>
+
+  <div class="filterbar">
+    <label class="search">
+      <span class="search-ic" id="searchIcon"></span>
+      <input id="searchInput" type="search" placeholder="Rechercher ou ajouter un token" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher un token">
+    </label>
+    <button type="button" class="chip" id="favBtn" aria-pressed="false"></button>
+    <label class="select" id="rangeWrap" hidden>
+      <select id="rangeSel" aria-label="Plage de classement"></select>
+    </label>
+    <div class="meta"><span id="count"></span><span id="updated" class="updated" aria-live="polite"></span></div>
+  </div>
+
+  <main>
+    <section id="listView">
+      <div class="summary" id="summary"></div>
+      <div id="list" class="list"></div>
+      <p class="credits">Données : CoinGecko, DefiLlama, Coinpaprika · actualisation toutes les 60 s</p>
+    </section>
+    <section id="vizView" hidden>
+      <div class="viz-stats" id="vizStats"></div>
+      <div class="stage" id="stage" tabindex="-1">
+        <div class="treemap" id="treemap" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="sheet-root" id="sheet" hidden>
+    <div class="sheet-backdrop" data-action="close"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Détails">
+      <div class="sheet-grab" aria-hidden="true"></div>
+      <div class="sheet-body"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
