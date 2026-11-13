@@ -916,9 +916,6 @@ body.viz main {
   color: var(--muted);
   font-weight: 650;
 }
-.tick.dashed {
-  border-left-style: dashed;
-}
 .bubble {
   position: absolute;
   left: 0;

@@ -5,7 +5,6 @@ export const ICONS = {
   list: svg(
     '<circle cx="4" cy="6" r="1.6" fill="currentColor"/><circle cx="4" cy="12" r="1.6" fill="currentColor"/><circle cx="4" cy="18" r="1.6" fill="currentColor"/><path d="M8.5 6h12M8.5 12h12M8.5 18h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   ),
-  bubbles: svg('<circle cx="14.5" cy="9" r="6" fill="currentColor"/><circle cx="6" cy="15" r="3.6" fill="currentColor"/><circle cx="13" cy="19.5" r="2" fill="currentColor"/>'),
   swarm: svg('<circle cx="9" cy="5.5" r="3" fill="currentColor"/><circle cx="5" cy="13" r="3" fill="currentColor"/><circle cx="16.5" cy="17" r="3" fill="currentColor"/>'),
   treemap: svg('<rect x="2.5" y="3.5" width="9" height="17" rx="1" fill="currentColor"/><rect x="13" y="3.5" width="8.5" height="7.5" rx="1" fill="currentColor"/><rect x="13" y="12.5" width="3.6" height="8" rx="1" fill="currentColor"/><rect x="17.9" y="12.5" width="3.6" height="8" rx="1" fill="currentColor"/>'),
   star: svg('<path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'),

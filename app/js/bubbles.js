@@ -1,9 +1,8 @@
 import { formatPct, esc, safeImg, imgSize } from './format.js';
 import { fillColors } from './colors.js';
 
-// Bubble field with a small "liquid" physics simulation.
-//   mode "bubbles": bubbles drift towards x = variation and pack together
-//   mode "swarm"  : x = variation (strict), bubbles stack vertically
+// Swarm view: x = variation (0 % line drawn), bubbles stack vertically and
+// move with a small "liquid" physics simulation.
 // Bubble AREA is proportional to the absolute variation of the timeframe.
 
 const quantile = (sorted, q) => {
@@ -39,7 +38,6 @@ export class BubbleField {
     this.layer.className = 'bubble-layer';
     stage.append(this.axis, this.layer);
     this.nodes = new Map();
-    this.mode = 'bubbles';
     this.tf = '1d';
     this.theme = 'dark';
     this.W = stage.clientWidth;
@@ -65,9 +63,7 @@ export class BubbleField {
   }
 
   // items: [{ id, sym, image, value, entity }]
-  setData(items, { mode, tf, theme }) {
-    const modeChanged = mode !== this.mode;
-    this.mode = mode;
+  setData(items, { tf, theme }) {
     this.tf = tf;
     this.theme = theme;
     const keep = new Set();
@@ -108,7 +104,6 @@ export class BubbleField {
         n.rt = 0;
       }
     }
-    if (modeChanged) for (const n of this.nodes.values()) n.vy += (Math.random() - 0.5) * 4;
     this.layout();
     if (this.visible) this.start();
   }
@@ -137,8 +132,6 @@ export class BubbleField {
       this.axis.innerHTML = '';
       return;
     }
-    const swarm = this.mode === 'swarm';
-
     // Radii: area ∝ |variation|, capped at the 95th percentile so a single
     // outlier does not crush everything else, then scaled to fill the stage.
     const abs = live.map((n) => Math.abs(n.value));
@@ -147,9 +140,9 @@ export class BubbleField {
     if (!(cap > 0)) cap = sortedAbs[sortedAbs.length - 1] || 1;
     const weights = abs.map((v) => 0.05 + 0.95 * Math.min(1, v / cap));
     const sumW = weights.reduce((a, b) => a + b, 0);
-    const fill = swarm ? 0.34 : 0.6;
+    const fill = 0.34;
     const R = Math.sqrt((fill * W * H) / (Math.PI * sumW));
-    const maxR = Math.min(W, H) * (swarm ? 0.13 : 0.19);
+    const maxR = Math.min(W, H) * 0.13;
     // Never smaller than what is needed to read a short ticker.
     const minR = Math.min(maxR, W * H > 400000 ? 13 : 11);
     let biggest = 0;
@@ -173,7 +166,7 @@ export class BubbleField {
     const padR = padL;
     const usable = Math.max(10, W - padL - padR);
     this.sx = (v) => padL + ((clamp(v, lo, hi) - lo) / (hi - lo)) * usable;
-    this.drawAxis(lo, hi, swarm);
+    this.drawAxis(lo, hi);
 
     for (const n of live) {
       if (n.born) {
@@ -185,21 +178,15 @@ export class BubbleField {
     }
   }
 
-  drawAxis(lo, hi, swarm) {
+  drawAxis(lo, hi) {
     const zero = this.sx(0);
-    let html = '';
-    if (swarm) {
-      html += `<div class="zone neg" style="width:${zero}px"></div><div class="zone pos" style="left:${zero}px"></div>`;
-      const step = niceStep(hi - lo);
-      for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) {
-        if (Math.abs(t) < step / 1000) continue;
-        const x = this.sx(t);
-        html += `<div class="tick" style="left:${x}px"><span>${formatPct(t)}</span></div>`;
-      }
-      html += `<div class="tick zero" style="left:${zero}px"><span>0 %</span></div>`;
-    } else {
-      html += `<div class="tick zero dashed" style="left:${zero}px"><span>0 %</span></div>`;
+    let html = `<div class="zone neg" style="width:${zero}px"></div><div class="zone pos" style="left:${zero}px"></div>`;
+    const step = niceStep(hi - lo);
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) {
+      if (Math.abs(t) < step / 1000) continue;
+      html += `<div class="tick" style="left:${this.sx(t)}px"><span>${formatPct(t)}</span></div>`;
     }
+    html += `<div class="tick zero" style="left:${zero}px"><span>0 %</span></div>`;
     this.axis.innerHTML = html;
   }
 
@@ -272,11 +259,9 @@ export class BubbleField {
 
   step(dt) {
     const { W, H } = this;
-    const swarm = this.mode === 'swarm';
     const nodes = [...this.nodes.values()];
-    const kx = swarm ? 0.05 : 0.0035;
-    // On tall stages (portrait) let the cluster spread vertically.
-    const ky = swarm ? 0.0025 : 0.0035 * Math.min(1, (W / H) ** 1.5);
+    const kx = 0.05;
+    const ky = 0.0025;
     const amp = this.reduced ? 0 : 0.022;
     const damping = Math.pow(0.9, dt);
     const cy = H / 2;
@@ -293,7 +278,7 @@ export class BubbleField {
       let fy = (cy - n.y) * ky;
       // Liquid feel: slow, smooth, per-bubble currents.
       const t = this.time * n.f;
-      fx += Math.sin(t + n.px) * amp * (swarm ? 0.3 : 1);
+      fx += Math.sin(t + n.px) * amp * 0.3;
       fy += Math.cos(t * 1.3 + n.py) * amp;
       n.vx = (n.vx + fx * dt) * damping;
       n.vy = (n.vy + fy * dt) * damping;
