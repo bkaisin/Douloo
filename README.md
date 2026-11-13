@@ -6,10 +6,9 @@ C'est une web app (PWA) pensée pour l'iPhone et l'iPad : on l'ouvre dans Safari
 
 ## Fonctions
 
-- **4 affichages** (boutons à droite des périodes) :
+- **3 affichages** (boutons à droite des périodes) :
   - **Liste** : rang, prix, variation sur chaque période, capitalisation, liens CoinGecko / TradingView. Tri par colonne. Les cartes du haut donnent la médiane et le nombre de tokens en hausse / en baisse pour chaque période ; toucher une carte sélectionne la période.
-  - **Bulles** : les bulles flottent comme dans un liquide. On peut les pousser du doigt, et elles se réarrangent quand on passe du portrait au paysage. La taille dépend de la variation (en valeur absolue), pas de la capitalisation. La ligne pointillée marque 0 %.
-  - **Essaim** : position horizontale = variation, la ligne verticale pleine est le 0 % (zone rouge à gauche, verte à droite).
+  - **Essaim** : bulles placées horizontalement selon leur variation ; la ligne verticale est le 0 % (zone rouge à gauche, verte à droite). Les bulles flottent comme dans un liquide, on peut les pousser du doigt, et elles se réarrangent quand on passe du portrait au paysage. Leur taille dépend de la variation (en valeur absolue), pas de la capitalisation.
   - **Heatmap** : tuiles proportionnelles à la capitalisation (échelle racine), couleur = variation.
 - **Tokens / Narratifs** : les narratifs (L1, L2, DeFi, DEX, Perps, Lending, Meme, AI, RWA, Oracle, Liquid Staking, Privacy, Gaming, DePIN, ZK, CEX, Actions, Or) affichent la variation moyenne pondérée par la capitalisation de leurs tokens.
 - **Plages** 1-100, 101-200, 201-300 ou Tous dans les vues graphiques.
@@ -75,7 +74,7 @@ app/
     api.js       appels CoinGecko / DefiLlama / Coinpaprika
     data.js      fusion des sources, top 300, narratifs, statistiques
     list.js      liste adaptative
-    bubbles.js   bulles et essaim (simulation « liquide »)
+    bubbles.js   essaim de bulles (simulation « liquide »)
     treemap.js   heatmap
     sheet.js     fiche détaillée et réglages
     config.js, format.js, colors.js, icons.js, store.js

@@ -244,7 +244,6 @@ function renderViz() {
   const tf = prefs.tf;
   const s = stats(items, tf);
   const legend = {
-    bubbles: 'taille = |variation|',
     swarm: 'position = variation · taille = |variation|',
     treemap: 'taille = capitalisation · couleur = variation',
   }[prefs.view];
@@ -264,7 +263,7 @@ function renderViz() {
     const data = items
       .filter((i) => i.ch[tf] != null)
       .map((i) => ({ id: i.id, sym: i.sym, image: i.image, value: i.ch[tf], entity: i }));
-    field.setData(data, { mode: prefs.view, tf, theme: prefs.theme });
+    field.setData(data, { tf, theme: prefs.theme });
   }
 }
 
@@ -647,7 +646,7 @@ function bind() {
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      if (prefs.view === 'bubbles' || prefs.view === 'swarm') field.start();
+      if (prefs.view === 'swarm') field.start();
       if (Date.now() - lastUpdate > REFRESH_MS - 5000) refresh();
     } else {
       field.stop();

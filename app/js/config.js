@@ -22,7 +22,6 @@ export const SHORT_TFS = ['15m', '30m', '4h'];
 
 export const VIEWS = [
   { key: 'list', label: 'Liste' },
-  { key: 'bubbles', label: 'Bulles' },
   { key: 'swarm', label: 'Essaim' },
   { key: 'treemap', label: 'Heatmap' },
 ];
