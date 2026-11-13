@@ -118,6 +118,9 @@ export function stats(items, tf) {
   return { up, down, flat: vals.length - up - down, n: vals.length, missing: items.length - vals.length, median: median(vals) };
 }
 
+// Abbreviations used when a narrative name does not fit in its bubble.
+const SHORT_LABELS = { lst: 'LST' };
+
 // Narratives: market-cap weighted change of their member tokens.
 export function buildNarratives(tokens, narrData) {
   if (!narrData) return [];
@@ -145,6 +148,7 @@ export function buildNarratives(tokens, narrData) {
     out.push({
       id: `n:${def.id}`,
       sym: def.label,
+      short: SHORT_LABELS[def.id],
       name: def.label,
       isNarrative: true,
       mcap: members.reduce((a, t) => a + (t.mcap ?? 0), 0),

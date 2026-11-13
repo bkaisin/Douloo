@@ -262,7 +262,7 @@ function renderViz() {
     field.resize();
     const data = items
       .filter((i) => i.ch[tf] != null)
-      .map((i) => ({ id: i.id, sym: i.sym, image: i.image, value: i.ch[tf], entity: i }));
+      .map((i) => ({ id: i.id, sym: i.sym, short: i.short, image: i.image, value: i.ch[tf], entity: i }));
     field.setData(data, { tf, theme: prefs.theme });
   }
 }

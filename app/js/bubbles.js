@@ -21,6 +21,97 @@ function textEm(s) {
   return Math.max(w, 1);
 }
 
+// Swarm placement. Sizes are given (they encode the variation). Each bubble,
+// biggest first, takes the free y closest to the centre line at its exact x;
+// only when that column is full up to the stage height is it moved sideways
+// to the nearest free spot, within [minX, maxX] (never across the 0 % line).
+// The result has no overlap, so the bubbles do not keep colliding.
+function placeSwarm(xs, rs, { gap, half, minX, maxX }) {
+  const n = xs.length;
+  const X = new Float64Array(n);
+  const Y = new Float64Array(n);
+  let maxR = 0;
+  for (const r of rs) maxR = Math.max(maxR, r);
+  const bw = 2 * maxR + gap;
+  const buckets = new Map();
+  const nearby = (x, r) => {
+    const out = [];
+    const reach = r + maxR + gap;
+    for (let b = Math.floor((x - reach) / bw); b <= Math.floor((x + reach) / bw); b++) {
+      const list = buckets.get(b);
+      if (!list) continue;
+      for (const j of list) {
+        const d = r + rs[j] + gap;
+        const dx = X[j] - x;
+        if (dx < d && dx > -d) out.push(j);
+      }
+    }
+    return out;
+  };
+  // Free y closest to the centre for radius r at x, or null if none within ±limit.
+  const freeY = (x, r, limit, flip) => {
+    const near = nearby(x, r);
+    const cands = [0];
+    for (const j of near) {
+      const d = r + rs[j] + gap;
+      const dx = X[j] - x;
+      const h = Math.sqrt(Math.max(0, d * d - dx * dx));
+      cands.push(Y[j] + h, Y[j] - h);
+    }
+    cands.sort((a, b) => Math.abs(a) - Math.abs(b) || (a - b) * flip);
+    for (const y of cands) {
+      if (Math.abs(y) > limit) return null;
+      let free = true;
+      for (const j of near) {
+        const d = r + rs[j] + gap - 0.01;
+        const dx = X[j] - x;
+        const dy = Y[j] - y;
+        if (dx * dx + dy * dy < d * d) {
+          free = false;
+          break;
+        }
+      }
+      if (free) return y;
+    }
+    return null;
+  };
+
+  const order = [...Array(n).keys()].sort((a, b) => rs[b] - rs[a] || a - b);
+  for (const i of order) {
+    const r = rs[i];
+    const limit = Math.max(0, half - r);
+    const flip = i % 2 ? 1 : -1; // alternate up/down and left/right
+    const x0 = clamp(xs[i], minX[i], maxX[i]);
+    let x = x0;
+    let y = freeY(x0, r, limit, flip);
+    if (y === null) {
+      const step = Math.max(3, r * 0.75);
+      for (let k = 1; y === null; k++) {
+        let inRange = false;
+        for (const sgn of [flip, -flip]) {
+          const xx = x0 + sgn * k * step;
+          if (xx < minX[i] || xx > maxX[i]) continue;
+          inRange = true;
+          const yy = freeY(xx, r, limit, flip);
+          if (yy !== null) {
+            x = xx;
+            y = yy;
+            break;
+          }
+        }
+        if (!inRange) break;
+      }
+      if (y === null) return { X, Y, failed: true };
+    }
+    X[i] = x;
+    Y[i] = y;
+    const b = Math.floor(x / bw);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b).push(i);
+  }
+  return { X, Y, failed: false };
+}
+
 function niceStep(span, target = 5) {
   const raw = span / target;
   const mag = 10 ** Math.floor(Math.log10(raw));
@@ -132,29 +223,22 @@ export class BubbleField {
       this.axis.innerHTML = '';
       return;
     }
-    // Radii: area ∝ |variation|, capped at the 95th percentile so a single
-    // outlier does not crush everything else, then scaled to fill the stage.
+    // Relative radii: area ∝ |variation|, capped at the 95th percentile so a
+    // single outlier does not crush everything else.
     const abs = live.map((n) => Math.abs(n.value));
     const sortedAbs = [...abs].sort((a, b) => a - b);
     let cap = quantile(sortedAbs, 0.95);
     if (!(cap > 0)) cap = sortedAbs[sortedAbs.length - 1] || 1;
-    const weights = abs.map((v) => 0.05 + 0.95 * Math.min(1, v / cap));
-    const sumW = weights.reduce((a, b) => a + b, 0);
-    const fill = 0.34;
-    const R = Math.sqrt((fill * W * H) / (Math.PI * sumW));
-    const maxR = Math.min(W, H) * 0.13;
-    // Never smaller than what is needed to read a short ticker.
-    const minR = Math.min(maxR, W * H > 400000 ? 13 : 11);
-    let biggest = 0;
-    live.forEach((n, i) => {
-      n.rt = clamp(R * Math.sqrt(weights[i]), minR, maxR);
-      biggest = Math.max(biggest, n.rt);
-    });
+    const base = abs.map((v) => Math.sqrt(0.05 + 0.95 * Math.min(1, v / cap)));
 
     // Horizontal scale: variation -> x. Always includes 0.
+    // Extreme outliers are pinned to the edges (their label keeps the real value).
     const vals = live.map((n) => n.value).sort((a, b) => a - b);
-    let lo = Math.min(0, quantile(vals, 0.02));
-    let hi = Math.max(0, quantile(vals, 0.98));
+    const q1 = quantile(vals, 0.25);
+    const q3 = quantile(vals, 0.75);
+    const iqr = Math.max(q3 - q1, 0.5);
+    let lo = Math.min(0, Math.max(quantile(vals, 0.02), q1 - 4 * iqr));
+    let hi = Math.max(0, Math.min(quantile(vals, 0.98), q3 + 4 * iqr));
     if (hi - lo < 0.2) {
       lo -= 0.1;
       hi += 0.1;
@@ -162,20 +246,67 @@ export class BubbleField {
     const span = hi - lo;
     lo -= span * 0.03;
     hi += span * 0.03;
-    const padL = Math.min(W * 0.3, biggest + 6);
-    const padR = padL;
-    const usable = Math.max(10, W - padL - padR);
-    this.sx = (v) => padL + ((clamp(v, lo, hi) - lo) / (hi - lo)) * usable;
-    this.drawAxis(lo, hi);
+    // Vertical band: the whole stage height (minus room for the axis labels).
+    const top = 22;
+    const half = (H - top - 4) / 2;
+    const cy = top + half;
+    const maxR = Math.max(6, Math.min(W * 0.12, half * 0.9, Math.min(W, H) * 0.16));
+    const gap = 2.5;
 
-    for (const n of live) {
+    // Global scale from the available area; the bubble sizes then stay fixed
+    // and crowded columns spread sideways instead of shrinking.
+    const sumB2 = base.reduce((a, b) => a + b * b, 0);
+    let s = Math.sqrt((0.36 * W * 2 * half) / (Math.PI * sumB2));
+    // Never smaller than what a short ticker needs.
+    let minR = W * H > 400000 ? 13 : 11;
+    const radii = () => base.map((b) => clamp(s * b, Math.min(minR, maxR), maxR));
+    // Circles cannot fill more than ~55 % of the band with this placement:
+    // when the bubbles cannot fit at all, scale them down before trying.
+    const area = (r) => r.reduce((a, x) => a + Math.PI * x * x, 0);
+    for (let k = 0; k < 30 && area(radii()) > 0.55 * W * 2 * half; k++) {
+      s *= 0.95;
+      minR *= 0.95;
+    }
+    let best;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const r = radii();
+      const pad = Math.min(W * 0.3, Math.max(...r) + 6);
+      const usable = Math.max(10, W - 2 * pad);
+      const sx = (v) => pad + ((clamp(v, lo, hi) - lo) / (hi - lo)) * usable;
+      const xs = live.map((n) => sx(n.value));
+      const zero = sx(0);
+      const minX = [];
+      const maxX = [];
+      live.forEach((n, i) => {
+        let a = r[i];
+        let b = W - r[i];
+        if (n.value <= -0.05) b = Math.min(b, zero - 1);
+        else if (n.value >= 0.05) a = Math.max(a, zero + 1);
+        if (b < a) a = b = clamp(xs[i], r[i], W - r[i]);
+        minX.push(a);
+        maxX.push(b);
+      });
+      const placed = placeSwarm(xs, r, { gap, half, minX, maxX });
+      best = { r, sx, x: placed.X, y: placed.Y };
+      if (!placed.failed) break;
+      // Not even room sideways (far too many bubbles): scale everything down.
+      s *= 0.9;
+      minR *= 0.9;
+    }
+
+    this.sx = best.sx;
+    this.drawAxis(lo, hi);
+    live.forEach((n, i) => {
+      n.rt = best.r[i];
+      n.tx = best.x[i];
+      n.ty = cy + best.y[i];
       if (n.born) {
         n.born = false;
-        n.x = clamp(this.sx(n.value) + (Math.random() - 0.5) * 40, n.rt, W - n.rt);
-        n.y = clamp(H / 2 + (Math.random() - 0.5) * H * 0.8, n.rt, H - n.rt);
+        n.x = n.tx + (Math.random() - 0.5) * 6;
+        n.y = n.ty + (Math.random() - 0.5) * 6;
       }
       this.paint(n);
-    }
+    });
   }
 
   drawAxis(lo, hi) {
@@ -195,31 +326,28 @@ export class BubbleField {
     const { item } = n;
     const rt = n.rt;
     const { bg, fg } = fillColors(n.value, this.tf, this.theme);
-    const sym = item.sym;
-    const em = textEm(sym);
+    let sym = item.sym;
+    let em = textEm(sym);
     const hasImg = !!item.image;
     let mode;
     if (rt >= 31 && hasImg) mode = 'full';
     else if (rt >= 20 && hasImg) mode = 'icon';
     else if (rt >= 26) mode = 'pct';
     else mode = 'tk';
-    let fsT;
-    let icon = 0;
-    if (mode === 'full') {
-      icon = rt * 0.48;
-      fsT = Math.min(rt * 0.33, (rt * 1.55) / em);
-    } else if (mode === 'icon') {
-      icon = rt * 0.62;
-      fsT = Math.min(rt * 0.36, (rt * 1.5) / em);
-    } else if (mode === 'pct') {
-      fsT = Math.min(rt * 0.42, (rt * 1.6) / em);
-    } else {
-      fsT = Math.min(rt * 0.5, (rt * 1.7) / em);
+    // [max font / radius, usable width / radius] for each label layout.
+    const [kH, kW] = { full: [0.33, 1.55], icon: [0.36, 1.5], pct: [0.42, 1.6], tk: [0.5, 1.7] }[mode];
+    const icon = mode === 'full' ? rt * 0.48 : mode === 'icon' ? rt * 0.62 : 0;
+    let fsT = Math.min(rt * kH, (rt * kW) / em);
+    // Long names (e.g. "Liquid Staking") fall back to their short form.
+    if (fsT < 7 && item.short && item.short !== sym) {
+      sym = item.short;
+      em = textEm(sym);
+      fsT = Math.min(rt * kH, (rt * kW) / em);
     }
     const showText = fsT >= 4;
     const showPct = mode === 'full' || mode === 'pct';
     const pct = showPct ? formatPct(n.value) : '';
-    const sig = `${Math.round(rt * 2)}|${mode}|${bg}|${fg}|${pct}|${showText}`;
+    const sig = `${Math.round(rt * 2)}|${mode}|${bg}|${fg}|${pct}|${showText}|${sym}`;
     if (sig === n.sig) return;
     n.sig = sig;
     const el = n.el;
@@ -260,11 +388,11 @@ export class BubbleField {
   step(dt) {
     const { W, H } = this;
     const nodes = [...this.nodes.values()];
+    // Springs towards the beeswarm target + slow currents (liquid feel).
     const kx = 0.05;
-    const ky = 0.0025;
-    const amp = this.reduced ? 0 : 0.022;
+    const ky = 0.014;
+    const amp = this.reduced ? 0 : 0.03;
     const damping = Math.pow(0.9, dt);
-    const cy = H / 2;
 
     for (const n of nodes) {
       n.r += (n.rt - n.r) * Math.min(1, 0.12 * dt);
@@ -274,8 +402,8 @@ export class BubbleField {
         continue;
       }
       if (n.fixed) continue;
-      let fx = (this.sx(n.value) - n.x) * kx;
-      let fy = (cy - n.y) * ky;
+      let fx = ((n.tx ?? W / 2) - n.x) * kx;
+      let fy = ((n.ty ?? H / 2) - n.y) * ky;
       // Liquid feel: slow, smooth, per-bubble currents.
       const t = this.time * n.f;
       fx += Math.sin(t + n.px) * amp * 0.3;
