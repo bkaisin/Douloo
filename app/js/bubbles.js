@@ -223,13 +223,13 @@ export class BubbleField {
       this.axis.innerHTML = '';
       return;
     }
-    // Relative radii: area ∝ |variation|, capped at the 95th percentile so a
-    // single outlier does not crush everything else.
+    // Relative radii: area ∝ |variation| (with a small floor so ~0 % stays
+    // visible). No cap here: only bubbles above maxR are reduced, below.
     const abs = live.map((n) => Math.abs(n.value));
     const sortedAbs = [...abs].sort((a, b) => a - b);
-    let cap = quantile(sortedAbs, 0.95);
-    if (!(cap > 0)) cap = sortedAbs[sortedAbs.length - 1] || 1;
-    const base = abs.map((v) => Math.sqrt(0.05 + 0.95 * Math.min(1, v / cap)));
+    let ref = quantile(sortedAbs, 0.9);
+    if (!(ref > 0)) ref = sortedAbs[sortedAbs.length - 1] || 1;
+    const base = abs.map((v) => Math.sqrt(0.05 + (0.95 * v) / ref));
 
     // Horizontal scale: variation -> x. Always includes 0.
     // Extreme outliers are pinned to the edges (their label keeps the real value).
@@ -250,20 +250,35 @@ export class BubbleField {
     const top = 22;
     const half = (H - top - 4) / 2;
     const cy = top + half;
-    const maxR = Math.max(6, Math.min(W * 0.12, half * 0.9, Math.min(W, H) * 0.16));
     const gap = 2.5;
-
-    // Global scale from the available area; the bubble sizes then stay fixed
-    // and crowded columns spread sideways instead of shrinking.
-    const sumB2 = base.reduce((a, b) => a + b * b, 0);
-    let s = Math.sqrt((0.36 * W * 2 * half) / (Math.PI * sumB2));
+    const band = W * 2 * half;
+    const count = live.length;
+    // Maximum radius, from the screen size and the number of bubbles: twice the
+    // radius every bubble would have if they all had the same size (covering
+    // 36 % of the band), and never more than 22 % of the smaller side.
+    // Only the bubbles above it are reduced.
+    const evenR = Math.sqrt((0.36 * band) / (Math.PI * count));
+    const maxR = Math.max(8, Math.min(2 * evenR, 0.22 * Math.min(W, 2 * half)));
     // Never smaller than what a short ticker needs.
-    let minR = W * H > 400000 ? 13 : 11;
+    let minR = Math.min(maxR, W * H > 400000 ? 13 : 11);
     const radii = () => base.map((b) => clamp(s * b, Math.min(minR, maxR), maxR));
+    const area = (r) => r.reduce((a, x) => a + Math.PI * x * x, 0);
+
+    // Global scale: bubbles cover ~36 % of the band, the clamped ones included.
+    // The sizes then stay fixed and crowded columns spread sideways.
+    let s = 1;
+    let sLo = 0;
+    let sHi = 1;
+    while (area(base.map((b) => clamp(sHi * b, minR, maxR))) < 0.36 * band && sHi < 1e6) sHi *= 2;
+    for (let k = 0; k < 30; k++) {
+      s = (sLo + sHi) / 2;
+      if (area(radii()) < 0.36 * band) sLo = s;
+      else sHi = s;
+    }
+    s = sLo;
     // Circles cannot fill more than ~55 % of the band with this placement:
     // when the bubbles cannot fit at all, scale them down before trying.
-    const area = (r) => r.reduce((a, x) => a + Math.PI * x * x, 0);
-    for (let k = 0; k < 30 && area(radii()) > 0.55 * W * 2 * half; k++) {
+    for (let k = 0; k < 30 && area(radii()) > 0.55 * band; k++) {
       s *= 0.95;
       minR *= 0.95;
     }
